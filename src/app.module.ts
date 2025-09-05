@@ -2,12 +2,49 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { LoggerModule } from 'nestjs-pino';
+import pino from 'pino';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],
+    }),
+
+    LoggerModule.forRootAsync({
+      useFactory: () => {
+        // транспорт: у файл + красивий консольний вивід
+        const transport = pino.transport({
+          targets: [
+            {
+              target: 'pino-pretty',
+              options: { colorize: true },
+              level: 'info',
+            },
+            {
+              target: 'pino/file',
+              options: { destination: './logs/app.log', mkdir: true },
+              level: 'debug',
+            },
+          ],
+        });
+        return {
+          pinoHttp: {
+            transport,
+            level: 'debug',
+            // корисні поля у кожному логу HTTP:
+            serializers: {
+              req(req) {
+                return { method: req.method, url: req.url, params: req.params, query: req.query };
+              },
+              res(res) {
+                return { statusCode: res.statusCode };
+              },
+            },
+          },
+        };
+      },
     }),
 
     TypeOrmModule.forRootAsync({
