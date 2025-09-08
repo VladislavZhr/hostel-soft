@@ -1,9 +1,10 @@
-// app.module.ts
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
-import pino from 'pino';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -13,30 +14,55 @@ import pino from 'pino';
     }),
 
     LoggerModule.forRootAsync({
-      useFactory: () => {
-        // транспорт: у файл + красивий консольний вивід
-        const transport = pino.transport({
-          targets: [
-            {
-              target: 'pino-pretty',
-              options: { colorize: true },
-              level: 'info',
-            },
-            {
-              target: 'pino/file',
-              options: { destination: './logs/app.log', mkdir: true },
-              level: 'debug',
-            },
-          ],
-        });
+      inject: [ConfigService],
+      useFactory: (cfg: ConfigService) => {
+        const isDev = cfg.get('NODE_ENV') === 'development';
+
         return {
           pinoHttp: {
-            transport,
-            level: 'debug',
-            // корисні поля у кожному логу HTTP:
+            level: isDev ? 'debug' : 'info',
+            transport: isDev
+              ? {
+                targets: [
+                  {
+                    target: 'pino-pretty',
+                    level: 'debug',
+                    options: {
+                      colorize: true,
+                      singleLine: true,
+                      translateTime: 'HH:MM:ss Z',
+                    },
+                  },
+                  {
+                    target: 'pino/file',
+                    level: 'debug',
+                    options: {
+                      destination: './logs/app.log',
+                      mkdir: true,
+                    },
+                  },
+                ],
+              }
+              : {
+                targets: [
+                  {
+                    target: 'pino/file',
+                    level: 'info',
+                    options: {
+                      destination: './logs/app.log',
+                      mkdir: true,
+                    },
+                  },
+                ],
+              },
             serializers: {
               req(req) {
-                return { method: req.method, url: req.url, params: req.params, query: req.query };
+                return {
+                  method: req.method,
+                  url: req.url,
+                  params: req.params,
+                  query: req.query,
+                };
               },
               res(res) {
                 return { statusCode: res.statusCode };
@@ -58,10 +84,12 @@ import pino from 'pino';
         password: cfg.get<string>('DB_PASS') ?? '',
         database: cfg.get<string>('DB_NAME') ?? 'postgres',
         autoLoadEntities: true,
-        synchronize: true, // тільки для dev
+        synchronize: true, // тільки для розробки
         logging: cfg.get('NODE_ENV') === 'development',
       }),
     }),
+    UsersModule,
+    AuthModule,
   ],
 })
 export class AppModule {}
