@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 import { Reflector } from '@nestjs/core';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -24,6 +25,8 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // серіалізація (Exclude/Expose у DTO/Entities)
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));

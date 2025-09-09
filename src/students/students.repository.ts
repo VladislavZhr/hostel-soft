@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Student } from './entities/student.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { Repository, DeepPartial } from 'typeorm';
+import { EntityNotFoundException } from '../common/errors/exceptions';
 
 type StudentPreloadPatch = Omit<DeepPartial<Student>, 'id'>;          // для preload
 
@@ -41,7 +42,7 @@ export class StudentRepository {
     patch: StudentPreloadPatch,
   ): Promise<Student> {
     const merged = await this.repo.preload({ id, ...patch });
-    if (!merged) throw new NotFoundException('Student not found')
+    if (!merged) throw new EntityNotFoundException('Student')
     return this.repo.save(merged);
   }
 

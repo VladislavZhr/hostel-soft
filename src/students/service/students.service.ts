@@ -3,6 +3,12 @@ import { StudentRepository } from '../students.repository';
 import { CreateStudentDto } from '../dto/create-student.dto';
 import { Student } from '../entities/student.entity';
 import { UpdateStudentDto } from '../dto/UpdateStudentDto';
+import {
+  DuplicateStudentException,
+  DuplicateStudentValue,
+  EmptyPATCHRequest,
+  EntityNotFoundException,
+} from '../../common/errors/exceptions';
 
 
 @Injectable()
@@ -16,7 +22,7 @@ export class StudentsService {
     if(valid) {
       const student = await this.studRepository.createStudent(normalDto);
       return this.studRepository.save(student);
-    } else throw new NotFoundException(`Student already exists`);
+    } else throw new DuplicateStudentException();
   }
 
   //Метод перевіряє наявінсть дублів в бд по збіжністі студента по всім полям з іншим студентом, аналог equals() у Java
@@ -28,7 +34,7 @@ export class StudentsService {
   async checkExistingStudent(id: number): Promise<Student> {
     const existStudent = await this.studRepository.findStudentById(id);
     if (existStudent) return existStudent;
-    else throw new NotFoundException(`Student with id ${id} not found`);
+    else throw new EntityNotFoundException(`Student with id ${id}`);
   }
 
   async deleteStudent(id: number): Promise<number> {
@@ -50,10 +56,10 @@ export class StudentsService {
     const patch = this.normalize(dto);
     const keys = (Object.keys(patch) as (keyof UpdateStudentDto)[])
       .filter(k => patch[k] !== undefined);
-    if (keys.length === 0) throw new BadRequestException('Немає жодної зміни (порожній PATCH).');
+    if (keys.length === 0) throw new EmptyPATCHRequest();
     const noActualChanges = keys.every(k => (current as any)[k] === (patch as any)[k]);
     if (noActualChanges) {
-      throw new BadRequestException('Значення полів вже встановлені — оновлення не потрібне.');
+      throw new DuplicateStudentValue('Значення полів вже встановлені — оновлення не потрібне.');
     }
     return this.studRepository.updatePartialPreload(id, patch);
   }
