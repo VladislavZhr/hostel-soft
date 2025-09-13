@@ -8,6 +8,10 @@ import {
 import { Logger } from 'nestjs-pino';
 import { Reflector } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { writeFileSync } from 'fs';
+import * as YAML from 'yaml';
+
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -27,6 +31,21 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new AllExceptionsFilter());
+
+  const config = new DocumentBuilder()
+    .setTitle('Hostel API')
+    .setDescription('Документація інвентаризації')
+    .setVersion('1.0.0')
+    .addBearerAuth() // якщо використовуєш JWT — додасть кнопку Authorize
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document); // UI: http://localhost:3000/api/docs
+
+// === ЕКСПОРТ ДО ФАЙЛІВ ===
+  writeFileSync('./swagger.json', JSON.stringify(document, null, 2));
+  writeFileSync('./swagger.yaml', YAML.stringify(document));
+
 
   // серіалізація (Exclude/Expose у DTO/Entities)
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Student } from './entities/student.entity';
-import { CreateStudentDto } from './dto/create-student.dto';
+import { CreateStudentDto } from './dto/request/create-student.dto';
 import { Repository, DeepPartial, EntityManager, DataSource } from 'typeorm';
 import { EntityNotFoundException } from '../common/errors/exceptions';
 
