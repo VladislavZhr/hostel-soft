@@ -1,4 +1,4 @@
-
+import { ApiProperty } from '@nestjs/swagger';
 
 export enum InventoryKind {
   TULLE = 'tulle',

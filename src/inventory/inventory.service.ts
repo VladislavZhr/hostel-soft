@@ -2,9 +2,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { UpsertStockDto } from './dto/upsert-stock.dto';
-import { IssueItemDto } from './dto/issue-item.dto';
-import { ReturnItemDto } from './dto/return-item.dto';
+import { UpsertStockDto } from './dto/request/upsert-stock.dto';
+import { IssueItemDto } from './dto/request/issue-item.dto';
+import { ReturnItemDto } from './dto/request/return-item.dto';
 import { InventoryKind } from './entities/InventoryKind';
 import { InventoryStock } from './entities/inventory.entities';
 import { StudentInventory } from './entities/student-inventory.entity';

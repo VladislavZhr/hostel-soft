@@ -5,7 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { InventoryStock } from '../entities/inventory.entities';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { InventoryKind } from '../entities/InventoryKind';
-import { UpsertStockDto } from '../dto/upsert-stock.dto';
+import { UpsertStockDto } from '../dto/request/upsert-stock.dto';
 
 
 @Injectable()

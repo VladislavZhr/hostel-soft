@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException, ValidationError } from '@nestjs/common';
 import { StudentRepository } from '../students.repository';
-import { CreateStudentDto } from '../dto/create-student.dto';
+import { CreateStudentDto } from '../dto/request/create-student.dto';
 import { Student } from '../entities/student.entity';
-import { UpdateStudentDto } from '../dto/UpdateStudentDto';
+import { UpdateStudentDto } from '../dto/request/UpdateStudentDto';
 import {
   DuplicateStudentException,
   DuplicateStudentValue,
