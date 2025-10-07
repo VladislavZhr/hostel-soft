@@ -50,6 +50,17 @@ async function bootstrap() {
   // серіалізація (Exclude/Expose у DTO/Entities)
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
+  app.enableCors({
+    origin: [
+      'https://9430813741ef.ngrok-free.app',  // бек через ngrok
+      'http://192.168.0.219:3000',            // твій локальний фронт на Windows
+      'http://192.168.0.207:3000',            // фронт напарника
+      'http://localhost:3000',
+    ],
+    credentials: true,
+  });
+
+
   // префікс і версіонування API
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI }); // /v1/...
@@ -61,7 +72,8 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = Number(process.env.PORT) || 3000;
-  await app.listen(port);
+  //await app.listen(port);
+  await app.listen(port, '0.0.0.0');  // <-- важливо
   app.get(Logger).log(`Server listening on http://localhost:${port}`);
 }
 bootstrap();

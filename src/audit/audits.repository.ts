@@ -31,4 +31,9 @@ export class AuditsRepository {
       relations: { items: true },
     });
   }
+
+  async delete(id: string): Promise<void> {
+    await this.repo.delete({ id });
+  }
+
 }

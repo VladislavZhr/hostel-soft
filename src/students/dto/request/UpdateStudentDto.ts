@@ -17,9 +17,9 @@ export class UpdateStudentDto extends PartialType(CreateStudentDto) {
   @IsOptional() @IsString() @Length(1, 50)
   faculty?: string;
 
-  @ApiPropertyOptional({ example: 3 })
-  @IsOptional() @IsInt()
-  course?: number;
+  // @ApiPropertyOptional({ example: 3 })
+  // @IsOptional() @IsInt()
+  // course?: number;
 
   @ApiPropertyOptional({ example: 'КП-21', minLength: 1, maxLength: 50 })
   @IsOptional() @IsString() @Length(1, 50)

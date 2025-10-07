@@ -11,8 +11,8 @@ export class StudentDto {
   @ApiProperty({ example: 'A-212', description: 'Кімната' })
   roomNumber!: string;
 
-  @ApiProperty({ example: 'ФІОТ', description: 'Факультет' })
-  faculty!: string;
+  // @ApiProperty({ example: 'ФІОТ', description: 'Факультет' })
+  // faculty!: string;
 
   @ApiProperty({ example: 2, description: 'Курс' })
   course!: number;

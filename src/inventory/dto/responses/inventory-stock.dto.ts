@@ -18,12 +18,6 @@ export class InventoryStockDto {
   })
   total!: number;
 
-  @ApiProperty({
-    description: 'Доступна до видачі кількість (total - видано)',
-    example: 38,
-    minimum: 0,
-  })
-  available!: number;
 }
 
 // Альтернативна назва для списку (можеш використати той самий клас вище)

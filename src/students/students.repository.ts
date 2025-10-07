@@ -38,12 +38,11 @@ export class StudentRepository {
   }
 
 
-  existsExact(d: Pick<Student, 'fullName'|'roomNumber'|'faculty'|'course'|'studyGroup'>): Promise<boolean> {
+  existsExact(d: Pick<Student, 'fullName'|'roomNumber'|'faculty'|'studyGroup'>): Promise<boolean> {
     return this.repo.existsBy({
       fullName: d.fullName,
       roomNumber: d.roomNumber,
       faculty: d.faculty,
-      course: d.course,
       studyGroup: d.studyGroup,
     });
   }

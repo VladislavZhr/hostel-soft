@@ -8,8 +8,11 @@ export enum InventoryKind {
   PILLOWCASE = 'pillowcase',
   MATTRESS_COVER = 'mattressCover',
   DUVET_COVER = 'duvetCover',
-  TOWEL = 'towel',
+  TOWEL_WAFFLE = 'waffleTowel',
+  TOWEL_TERRY = 'terryTowel',
   SHEET = 'sheet',
   BEDSPREAD = 'cover',
   PILLOW = 'pillow',
+  TABLECLOTH = 'tablecloth',
+  BED_SET = 'bedSet',
 }
