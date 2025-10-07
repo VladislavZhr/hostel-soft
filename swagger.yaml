@@ -1,0 +1,837 @@
+openapi: 3.0.0
+paths:
+  /users:
+    post:
+      operationId: UsersController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserDto"
+      responses:
+        "200":
+          description: Створений користувач (без паролю)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateUserDto"
+      summary: Створити нового користувача
+      tags: &a1
+        - Users
+  /users/change-password:
+    post:
+      operationId: UsersController_changePassword
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordDto"
+      responses:
+        "200":
+          description: Пароль успішно змінено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangePasswordResponse"
+        "400":
+          description: Старий пароль невірний або дані некоректні
+        "404":
+          description: Користувача не знайдено
+      summary: Змінити пароль користувача
+      tags: *a1
+  /auth/login:
+    post:
+      operationId: AuthController_login
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginDto"
+      responses:
+        "201":
+          description: Успішна авторизація, повертається JWT токен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponseDto"
+      summary: Авторизація користувача за логіном та паролем
+      tags:
+        - auth
+  /students/add:
+    post:
+      description: Додає нового студента. Поля повинні бути унікальні разом (ПІБ,
+        кімната, факультет, курс, група).
+      operationId: StudentsController_addNewStudent
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentDto"
+      responses:
+        "201":
+          description: Створений студент
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateStudentResponseDto"
+        "400":
+          description: Валідаційна помилка або дублікати
+      summary: Створити студента
+      tags: &a2
+        - students
+  /students/get-all:
+    get:
+      operationId: StudentsController_getAllStudents
+      parameters: []
+      responses:
+        "200":
+          description: Масив студентів
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudentDto"
+      summary: Отримати всіх студентів
+      tags: *a2
+  /students/{id}:
+    get:
+      operationId: StudentsController_get
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            example: 1
+            type: number
+      responses:
+        "200":
+          description: Студент
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentDto"
+      summary: Отримати студента за ID
+      tags: *a2
+    patch:
+      operationId: StudentsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            example: 1
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStudentDto"
+      responses:
+        "200":
+          description: Оновлений студент
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateStudentResponseDto"
+      summary: Оновити дані студента
+      tags: *a2
+    delete:
+      operationId: StudentsController_delete
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            example: 1
+            type: number
+      responses:
+        "200":
+          description: Підтвердження видалення
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteStudentResponseDto"
+      summary: Видалити студента
+      tags: *a2
+  /students/import:
+    post:
+      description: "Приймає таблицю з полями: fullName, roomNumber, faculty, course,
+        studyGroup. Повертає звіт імпорту."
+      operationId: StudentsController_importStudents
+      parameters: []
+      requestBody:
+        required: true
+        description: Файл Excel/CSV з переліком студентів
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        "200":
+          description: Звіт імпорту
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportReportDto"
+        "400":
+          description: Неприпустимий тип файлу або помилка імпорту
+      summary: Імпорт студентів з файлу (.xlsx/.csv)
+      tags: *a2
+  /inventory/stock:
+    post:
+      operationId: InventoriesController_upsertStock
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertStockDto"
+      responses:
+        "201":
+          description: Збережений запис складу
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryStockDto"
+      summary: Створити/оновити залишок для виду інвентарю
+      tags: &a3
+        - inventory
+    get:
+      operationId: InventoriesController_listStock
+      parameters: []
+      responses:
+        "200":
+          description: Список складу з доступністю
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockSummaryDto"
+      summary: Отримати total/available по всіх видах
+      tags: *a3
+  /inventory/issue:
+    post:
+      operationId: InventoriesController_issue
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueItemDto"
+      responses:
+        "201":
+          description: Створено/оновлено позицію студента
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentInventoryDto"
+      summary: Видати студенту певну кількість інвентарю
+      tags: *a3
+  /inventory/return:
+    post:
+      operationId: InventoriesController_return
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReturnItemDto"
+      responses:
+        "200":
+          description: "Оновлена позиція студента або { closed: true }"
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/StudentInventoryDto"
+                  - $ref: "#/components/schemas/CloseFlagDto"
+      summary: Прийняти повне/часткове повернення
+      tags: *a3
+  /inventory/students/{studentId}/items:
+    get:
+      operationId: InventoriesController_listStudentItems
+      parameters:
+        - name: studentId
+          required: true
+          in: path
+          schema:
+            example: "1"
+            type: number
+      responses:
+        "200":
+          description: Масив активних позицій студента
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudentInventoryDto"
+      summary: Список активних позицій конкретного студента
+      tags: *a3
+  /inventory/export/assigned.xlsx:
+    get:
+      description: "Кожний рядок: ID студента, ПІБ, Кімната, Факультет, Група, Вид
+        інвентарю, Кількість."
+      operationId: InventoriesController_exportAssigned
+      parameters: []
+      responses:
+        "200":
+          description: Файл .xlsx (binary)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+      summary: "Експорт Excel: студенти з активним інвентарем (поточні закріплення)"
+      tags: *a3
+  /inventories/audits:
+    post:
+      operationId: InventoryAuditsController_create
+      parameters: []
+      responses:
+        "201":
+          description: Створений аудит із items[]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryAuditDto"
+      summary: Створити знімок складу (аудит)
+      tags: &a4
+        - inventory-audits
+    get:
+      operationId: InventoryAuditsController_list
+      parameters: []
+      responses:
+        "200":
+          description: Масив аудитів
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryAuditDto"
+      summary: Список аудитів
+      tags: *a4
+  /inventories/audits/{id}:
+    get:
+      operationId: InventoryAuditsController_get
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: UUID аудиту
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Деталі аудиту
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryAuditDto"
+      summary: Отримати аудит за ID
+      tags: *a4
+    delete:
+      operationId: InventoryAuditsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: UUID аудиту
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Аудит успішно видалено
+        "404":
+          description: Аудит не знайдено
+      summary: Видалити аудит за ID
+      tags: *a4
+info:
+  title: Hostel API
+  description: Документація інвентаризації
+  version: 1.0.0
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    CreateUserDto:
+      type: object
+      properties: {}
+    ChangePasswordDto:
+      type: object
+      properties: {}
+    ChangePasswordResponse:
+      type: object
+      properties: {}
+    LoginDto:
+      type: object
+      properties:
+        username:
+          type: string
+          example: admin
+          description: Унікальний логін користувача (від 3 до 64 символів)
+          minLength: 3
+          maxLength: 64
+        password:
+          type: string
+          example: qwerty123
+          description: Пароль користувача (від 3 до 128 символів)
+          minLength: 3
+          maxLength: 128
+      required:
+        - username
+        - password
+    LoginResponseDto:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          description: JWT токен для авторизації
+        id:
+          type: number
+          example: 1
+          description: ID користувача
+        username:
+          type: string
+          example: admin
+          description: Username користувача
+        issuedAt:
+          type: string
+          example: 2025-09-13T10:15:30.000Z
+          description: Час видачі токена (ISO 8601)
+        expiresAt:
+          type: string
+          example: 2025-09-13T12:15:30.000Z
+          description: Час закінчення дії токена (ISO 8601)
+      required:
+        - access_token
+        - id
+        - username
+        - issuedAt
+        - expiresAt
+    CreateStudentDto:
+      type: object
+      properties:
+        fullName:
+          type: string
+          example: Іваненко Іван Іванович
+          minLength: 6
+          maxLength: 255
+        roomNumber:
+          type: string
+          example: A-212
+          minLength: 3
+          maxLength: 10
+        faculty:
+          type: string
+          example: ФІОТ
+          minLength: 2
+          maxLength: 20
+        studyGroup:
+          type: string
+          example: КП-12
+          minLength: 2
+          maxLength: 20
+      required:
+        - fullName
+        - roomNumber
+        - faculty
+        - studyGroup
+    StudentDto:
+      type: object
+      properties:
+        id:
+          type: number
+          example: 1
+          description: ID студента
+        fullName:
+          type: string
+          example: Іваненко Іван Іванович
+          description: ПІБ
+        roomNumber:
+          type: string
+          example: A-212
+          description: Кімната
+        course:
+          type: number
+          example: 2
+          description: Курс
+        studyGroup:
+          type: string
+          example: КП-12
+          description: Навчальна група
+      required:
+        - id
+        - fullName
+        - roomNumber
+        - course
+        - studyGroup
+    CreateStudentResponseDto:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Student created
+        data:
+          $ref: "#/components/schemas/StudentDto"
+      required:
+        - message
+        - data
+    UpdateStudentDto:
+      type: object
+      properties:
+        fullName:
+          type: string
+          example: Петренко Петро Петрович
+          minLength: 1
+          maxLength: 255
+        roomNumber:
+          type: string
+          example: B-105
+          minLength: 1
+          maxLength: 10
+        faculty:
+          type: string
+          example: ФПМ
+          minLength: 1
+          maxLength: 50
+        studyGroup:
+          type: string
+          example: КП-21
+          minLength: 1
+          maxLength: 50
+    UpdateStudentResponseDto:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Student with id 1 updated successfully.
+        data:
+          $ref: "#/components/schemas/StudentDto"
+      required:
+        - message
+        - data
+    DeleteStudentResponseDto:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Student with id 1 deleted successfully.
+      required:
+        - message
+    ImportReportDto:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Import finished
+        totalRows:
+          type: number
+          example: 120
+          description: Всього рядків у файлі
+        validRows:
+          type: number
+          example: 115
+          description: Коректних рядків (після валідації)
+        inserted:
+          type: number
+          example: 100
+          description: Скільки нових створено
+        duplicatesSkipped:
+          type: number
+          example: 10
+          description: Скільки дублікатів пропущено
+        invalidRows:
+          description: Помилки по рядках
+          example:
+            - rowIndex: 7
+              errors:
+                - Duplicate student record
+          type: array
+          items:
+            type: string
+      required:
+        - message
+        - totalRows
+        - validRows
+        - inserted
+        - duplicatesSkipped
+        - invalidRows
+    InventoryKind:
+      type: string
+      enum:
+        - tulle
+        - curtains
+        - blanket
+        - mattress
+        - pillowcase
+        - mattressCover
+        - duvetCover
+        - waffleTowel
+        - terryTowel
+        - sheet
+        - cover
+        - pillow
+        - tablecloth
+        - bedSet
+    UpsertStockDto:
+      type: object
+      properties:
+        kind:
+          example: mattress
+          allOf:
+            - $ref: "#/components/schemas/InventoryKind"
+        total:
+          type: number
+          example: 50
+          minimum: 0
+      required:
+        - kind
+        - total
+    InventoryStockDto:
+      type: object
+      properties:
+        kind:
+          description: Вид інвентарю
+          example: blanket
+          allOf:
+            - $ref: "#/components/schemas/InventoryKind"
+        total:
+          type: number
+          description: Загальна кількість одиниць на складі
+          example: 50
+          minimum: 0
+      required:
+        - kind
+        - total
+    StockSummaryDto:
+      type: object
+      properties:
+        kind:
+          description: Вид інвентарю
+          example: blanket
+          allOf:
+            - $ref: "#/components/schemas/InventoryKind"
+        total:
+          type: number
+          description: Загальна кількість одиниць на складі
+          example: 50
+          minimum: 0
+      required:
+        - kind
+        - total
+    IssueItemDto:
+      type: object
+      properties:
+        studentId:
+          type: number
+          example: 1
+          minimum: 1
+        kind:
+          example: blanket
+          allOf:
+            - $ref: "#/components/schemas/InventoryKind"
+        quantity:
+          type: number
+          example: 2
+          minimum: 1
+      required:
+        - studentId
+        - kind
+        - quantity
+    StudentBriefDto:
+      type: object
+      properties:
+        id:
+          type: number
+          description: ID студента
+          example: 2
+        fullName:
+          type: string
+          description: ПІБ
+          example: Іваненко Іван Іванович
+        roomNumber:
+          type: string
+          description: Кімната
+          example: A-21
+        faculty:
+          type: string
+          description: Факультет
+          example: ФІОТ
+        course:
+          type: number
+          description: Курс
+          example: 1
+        studyGroup:
+          type: string
+          description: Навчальна група
+          example: КП-12
+      required:
+        - id
+        - fullName
+        - roomNumber
+        - faculty
+        - course
+        - studyGroup
+    StudentInventoryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: UUID позиції
+          example: ff8fd4f2-a5a5-4c69-b20b-4a4a5617a7c7
+          format: uuid
+        kind:
+          description: Вид інвентарю
+          example: towel
+          allOf:
+            - $ref: "#/components/schemas/InventoryKind"
+        quantity:
+          type: number
+          description: Поточна кількість, видана студенту (залишок по позиції)
+          example: 4
+          minimum: 0
+        issuedAt:
+          type: string
+          description: Час створення/першої видачі
+          example: 2025-09-12T21:42:37.186Z
+          format: date-time
+        returnedAt:
+          type: object
+          description: Час повернення (null, якщо ще не повернено)
+          example: null
+          nullable: true
+          format: date-time
+        student:
+          description: Дані студента-власника позиції
+          allOf:
+            - $ref: "#/components/schemas/StudentBriefDto"
+      required:
+        - id
+        - kind
+        - quantity
+        - issuedAt
+        - student
+    CloseFlagDto:
+      type: object
+      properties:
+        closed:
+          type: boolean
+          description: Ознака повного закриття позиції після повернення
+          example: true
+      required:
+        - closed
+    ReturnItemDto:
+      type: object
+      properties:
+        studentId:
+          type: number
+          example: 1
+          minimum: 1
+        kind:
+          example: blanket
+          allOf:
+            - $ref: "#/components/schemas/InventoryKind"
+        quantity:
+          type: number
+          example: 1
+          minimum: 1
+          description: "Опціонально: якщо пропущено — повне повернення"
+      required:
+        - studentId
+        - kind
+    InventoryAuditItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: UUID позиції аудиту
+          example: 8bf4a0b9-2d24-4d1c-9a2e-1f7b4f6e4a10
+        kind:
+          description: Вид інвентарю
+          example: blanket
+          allOf:
+            - $ref: "#/components/schemas/InventoryKind"
+        total:
+          type: number
+          description: Загальна кількість на момент аудиту
+          example: 120
+          minimum: 0
+        issued:
+          type: number
+          description: Кількість, видана студентам
+          example: 37
+          minimum: 0
+        available:
+          type: number
+          description: Доступна кількість
+          example: 83
+          minimum: 0
+      required:
+        - id
+        - kind
+        - total
+        - issued
+        - available
+    InventoryAuditDto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: UUID аудиту
+          example: f115c75d-41ba-4657-bbff-7faff9404fce
+        createdAt:
+          type: string
+          description: Мітка часу створення аудиту
+          example: 2025-09-12T21:47:10.123Z
+          format: date-time
+        items:
+          description: Знімок складу на момент аудиту
+          example:
+            - id: 1a2b3c4d-0000-0000-0000-000000000001
+              kind: blanket
+              total: 120
+              issued: 37
+              available: 83
+            - id: 1a2b3c4d-0000-0000-0000-000000000002
+              kind: mattress
+              total: 60
+              issued: 12
+              available: 48
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryAuditItemDto"
+      required:
+        - id
+        - createdAt
+        - items
