@@ -11,10 +11,38 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateUserDto"
       responses:
-        "201":
-          description: ""
-      tags:
+        "200":
+          description: Створений користувач (без паролю)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateUserDto"
+      summary: Створити нового користувача
+      tags: &a1
         - Users
+  /users/change-password:
+    post:
+      operationId: UsersController_changePassword
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordDto"
+      responses:
+        "200":
+          description: Пароль успішно змінено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangePasswordResponse"
+        "400":
+          description: Старий пароль невірний або дані некоректні
+        "404":
+          description: Користувача не знайдено
+      summary: Змінити пароль користувача
+      tags: *a1
   /auth/login:
     post:
       operationId: AuthController_login
@@ -57,7 +85,7 @@ paths:
         "400":
           description: Валідаційна помилка або дублікати
       summary: Створити студента
-      tags: &a1
+      tags: &a2
         - students
   /students/get-all:
     get:
@@ -73,7 +101,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/StudentDto"
       summary: Отримати всіх студентів
-      tags: *a1
+      tags: *a2
   /students/{id}:
     get:
       operationId: StudentsController_get
@@ -92,7 +120,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/StudentDto"
       summary: Отримати студента за ID
-      tags: *a1
+      tags: *a2
     patch:
       operationId: StudentsController_update
       parameters:
@@ -116,7 +144,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UpdateStudentResponseDto"
       summary: Оновити дані студента
-      tags: *a1
+      tags: *a2
     delete:
       operationId: StudentsController_delete
       parameters:
@@ -134,7 +162,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DeleteStudentResponseDto"
       summary: Видалити студента
-      tags: *a1
+      tags: *a2
   /students/import:
     post:
       description: "Приймає таблицю з полями: fullName, roomNumber, faculty, course,
@@ -164,7 +192,7 @@ paths:
         "400":
           description: Неприпустимий тип файлу або помилка імпорту
       summary: Імпорт студентів з файлу (.xlsx/.csv)
-      tags: *a1
+      tags: *a2
   /inventory/stock:
     post:
       operationId: InventoriesController_upsertStock
@@ -183,7 +211,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InventoryStockDto"
       summary: Створити/оновити залишок для виду інвентарю
-      tags: &a2
+      tags: &a3
         - inventory
     get:
       operationId: InventoriesController_listStock
@@ -198,7 +226,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/StockSummaryDto"
       summary: Отримати total/available по всіх видах
-      tags: *a2
+      tags: *a3
   /inventory/issue:
     post:
       operationId: InventoriesController_issue
@@ -217,7 +245,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/StudentInventoryDto"
       summary: Видати студенту певну кількість інвентарю
-      tags: *a2
+      tags: *a3
   /inventory/return:
     post:
       operationId: InventoriesController_return
@@ -238,7 +266,7 @@ paths:
                   - $ref: "#/components/schemas/StudentInventoryDto"
                   - $ref: "#/components/schemas/CloseFlagDto"
       summary: Прийняти повне/часткове повернення
-      tags: *a2
+      tags: *a3
   /inventory/students/{studentId}/items:
     get:
       operationId: InventoriesController_listStudentItems
@@ -259,7 +287,23 @@ paths:
                 items:
                   $ref: "#/components/schemas/StudentInventoryDto"
       summary: Список активних позицій конкретного студента
-      tags: *a2
+      tags: *a3
+  /inventory/export/assigned.xlsx:
+    get:
+      description: "Кожний рядок: ID студента, ПІБ, Кімната, Факультет, Група, Вид
+        інвентарю, Кількість."
+      operationId: InventoriesController_exportAssigned
+      parameters: []
+      responses:
+        "200":
+          description: Файл .xlsx (binary)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+      summary: "Експорт Excel: студенти з активним інвентарем (поточні закріплення)"
+      tags: *a3
   /inventories/audits:
     post:
       operationId: InventoryAuditsController_create
@@ -272,7 +316,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InventoryAuditDto"
       summary: Створити знімок складу (аудит)
-      tags: &a3
+      tags: &a4
         - inventory-audits
     get:
       operationId: InventoryAuditsController_list
@@ -287,7 +331,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/InventoryAuditDto"
       summary: Список аудитів
-      tags: *a3
+      tags: *a4
   /inventories/audits/{id}:
     get:
       operationId: InventoryAuditsController_get
@@ -307,7 +351,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/InventoryAuditDto"
       summary: Отримати аудит за ID
-      tags: *a3
+      tags: *a4
+    delete:
+      operationId: InventoryAuditsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: UUID аудиту
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Аудит успішно видалено
+        "404":
+          description: Аудит не знайдено
+      summary: Видалити аудит за ID
+      tags: *a4
 info:
   title: Hostel API
   description: Документація інвентаризації
@@ -323,6 +384,12 @@ components:
       type: http
   schemas:
     CreateUserDto:
+      type: object
+      properties: {}
+    ChangePasswordDto:
+      type: object
+      properties: {}
+    ChangePasswordResponse:
       type: object
       properties: {}
     LoginDto:
@@ -390,9 +457,6 @@ components:
           example: ФІОТ
           minLength: 2
           maxLength: 20
-        course:
-          type: number
-          example: 2
         studyGroup:
           type: string
           example: КП-12
@@ -402,7 +466,6 @@ components:
         - fullName
         - roomNumber
         - faculty
-        - course
         - studyGroup
     StudentDto:
       type: object
@@ -419,10 +482,6 @@ components:
           type: string
           example: A-212
           description: Кімната
-        faculty:
-          type: string
-          example: ФІОТ
-          description: Факультет
         course:
           type: number
           example: 2
@@ -435,7 +494,6 @@ components:
         - id
         - fullName
         - roomNumber
-        - faculty
         - course
         - studyGroup
     CreateStudentResponseDto:
@@ -467,9 +525,6 @@ components:
           example: ФПМ
           minLength: 1
           maxLength: 50
-        course:
-          type: number
-          example: 3
         studyGroup:
           type: string
           example: КП-21
@@ -542,10 +597,13 @@ components:
         - pillowcase
         - mattressCover
         - duvetCover
-        - towel
+        - waffleTowel
+        - terryTowel
         - sheet
         - cover
         - pillow
+        - tablecloth
+        - bedSet
     UpsertStockDto:
       type: object
       properties:
@@ -573,15 +631,9 @@ components:
           description: Загальна кількість одиниць на складі
           example: 50
           minimum: 0
-        available:
-          type: number
-          description: Доступна до видачі кількість (total - видано)
-          example: 38
-          minimum: 0
       required:
         - kind
         - total
-        - available
     StockSummaryDto:
       type: object
       properties:
@@ -595,15 +647,9 @@ components:
           description: Загальна кількість одиниць на складі
           example: 50
           minimum: 0
-        available:
-          type: number
-          description: Доступна до видачі кількість (total - видано)
-          example: 38
-          minimum: 0
       required:
         - kind
         - total
-        - available
     IssueItemDto:
       type: object
       properties:
@@ -623,50 +669,79 @@ components:
         - studentId
         - kind
         - quantity
-    StudentInventoryDto:
+    StudentBriefDto:
       type: object
       properties:
         id:
           type: number
-          description: ID позиції (якщо є)
-          example: 123
-        studentId:
+          description: ID студента
+          example: 2
+        fullName:
+          type: string
+          description: ПІБ
+          example: Іваненко Іван Іванович
+        roomNumber:
+          type: string
+          description: Кімната
+          example: A-21
+        faculty:
+          type: string
+          description: Факультет
+          example: ФІОТ
+        course:
           type: number
-          description: ID студента-власника позиції
+          description: Курс
           example: 1
-          minimum: 1
+        studyGroup:
+          type: string
+          description: Навчальна група
+          example: КП-12
+      required:
+        - id
+        - fullName
+        - roomNumber
+        - faculty
+        - course
+        - studyGroup
+    StudentInventoryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          description: UUID позиції
+          example: ff8fd4f2-a5a5-4c69-b20b-4a4a5617a7c7
+          format: uuid
         kind:
           description: Вид інвентарю
-          example: mattress
+          example: towel
           allOf:
             - $ref: "#/components/schemas/InventoryKind"
         quantity:
           type: number
           description: Поточна кількість, видана студенту (залишок по позиції)
-          example: 2
+          example: 4
           minimum: 0
-        isClosed:
-          type: boolean
-          description: Ознака закриття позиції (повністю повернено)
-          example: false
         issuedAt:
           type: string
           description: Час створення/першої видачі
-          example: 2025-09-12T10:15:30.000Z
+          example: 2025-09-12T21:42:37.186Z
           format: date-time
-        updatedAt:
-          type: string
-          description: Час останнього оновлення позиції
-          example: 2025-09-12T11:02:10.000Z
+        returnedAt:
+          type: object
+          description: Час повернення (null, якщо ще не повернено)
+          example: null
+          nullable: true
           format: date-time
+        student:
+          description: Дані студента-власника позиції
+          allOf:
+            - $ref: "#/components/schemas/StudentBriefDto"
       required:
         - id
-        - studentId
         - kind
         - quantity
-        - isClosed
         - issuedAt
-        - updatedAt
+        - student
     CloseFlagDto:
       type: object
       properties:

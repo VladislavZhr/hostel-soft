@@ -1,8 +1,10 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
+import { APP_GUARD } from '@nestjs/core'; // 👈 додай це
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'; // 👈 і це
+
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { StudentsModule } from './students/students.module';
@@ -91,11 +93,19 @@ import { AuditModule } from './audit/audit.module';
         logging: cfg.get('NODE_ENV') === 'development',
       }),
     }),
+
     UsersModule,
     AuthModule,
     StudentsModule,
     InventoryModule,
     AuditModule,
+  ],
+
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard, // 👈 глобально активує JWT-перевірку
+    },
   ],
 })
 export class AppModule {}

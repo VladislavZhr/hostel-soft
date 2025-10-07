@@ -28,6 +28,55 @@ export class StudentInventoryRepository {
     );
   }
 
+  async listActiveAssignmentsFlat(): Promise<Array<{
+    studentId: number;
+    fullName: string;
+    roomNumber: string;
+    faculty: string;
+    studyGroup: string;
+    kind: InventoryKind;
+    quantity: number;
+  }>> {
+    const qb = this.repo
+      .createQueryBuilder('a')
+      .innerJoin('a.student', 's')
+      .select('s.id', 'studentId')
+      .addSelect('s.fullName', 'fullName')
+      .addSelect('s.roomNumber', 'roomNumber')
+      .addSelect('s.faculty', 'faculty')
+      .addSelect('s.studyGroup', 'studyGroup')
+      .addSelect('a.kind', 'kind')
+      .addSelect('COALESCE(SUM(a.quantity), 0)', 'quantity')
+      .where('a.returnedAt IS NULL')
+      .groupBy('s.id')
+      .addGroupBy('s.fullName')
+      .addGroupBy('s.roomNumber')
+      .addGroupBy('s.faculty')
+      .addGroupBy('s.studyGroup')
+      .addGroupBy('a.kind')
+      .orderBy('s.fullName', 'ASC');
+
+    const rows = await qb.getRawMany<{
+      studentId: string;
+      fullName: string;
+      roomNumber: string;
+      faculty: string;
+      studyGroup: string;
+      kind: InventoryKind;
+      quantity: string;
+    }>();
+
+    return rows.map(r => ({
+      studentId: Number(r.studentId),
+      fullName: r.fullName,
+      roomNumber: r.roomNumber,
+      faculty: r.faculty,
+      studyGroup: r.studyGroup,
+      kind: r.kind,
+      quantity: Number(r.quantity),
+    }));
+  }
+
   // ====== CRUD-хелпери ======
   create(dto: Partial<StudentInventory>): StudentInventory {
     return this.repo.create(dto);

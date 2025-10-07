@@ -67,4 +67,13 @@ export class InventoryAuditsService {
   findOne(id: string) {
     return this.auditRepo.findOne(id);
   }
+
+  async remove(id: string): Promise<void> {
+    const audit = await this.auditRepo.findOne(id);
+    if (!audit) {
+      throw new Error('AUDIT_NOT_FOUND'); // або кастомний NotFoundException
+    }
+    await this.auditRepo.delete(id);
+  }
+
 }

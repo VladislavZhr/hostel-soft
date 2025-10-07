@@ -1,11 +1,15 @@
-
+// src/students/service/importStudentService.service.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validateSync, ValidationError } from 'class-validator';
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import { CreateStudentDto } from '../dto/request/create-student.dto';
 import { Student } from '../entities/student.entity';
+import type { Buffer as NodeBuffer } from 'node:buffer';
+import { Readable } from 'typeorm/browser/platform/BrowserPlatformTools';
+import { PassThrough } from 'node:stream';
+import * as Stream from 'node:stream';
 
 /**
  * Контракти
@@ -14,7 +18,6 @@ export type ImportRow = {
   fullName: string;
   roomNumber: string;
   faculty: string;
-  course: string | number;
   studyGroup: string;
 };
 
@@ -35,24 +38,23 @@ const CHUNK_SIZE = 1000;
 const DATA_ROW_OFFSET = 2; // 1 — заголовок, 2 — перший рядок з даними
 
 /**
- * Нормалізація ключів заголовків (укр/рос/англ, пробіли, крапки, регістр)
+ * Нормалізація ключів заголовків
  */
-type Canon = 'fullName' | 'roomNumber' | 'faculty' | 'course' | 'studyGroup';
+type Canon = 'fullName' | 'roomNumber' | 'faculty' | 'studyGroup';
 
 const normalizeKey = (s: string) =>
   s
-    .normalize('NFKC')        // уніфікація Юнікоду (напр., № -> No)
-    .replace(/\u00A0/g, ' ')  // NBSP -> пробіл
+    .normalize('NFKC')
+    .replace(/\u00A0/g, ' ')
     .toLowerCase()
     .trim()
-    .replace(/[^0-9\p{L}]+/gu, ''); // ЗАЛИШИТИ лише букви/цифри (Unicode)
+    .replace(/[^0-9\p{L}]+/gu, '');
 
 function buildHeaderAliases(): Record<string, Canon> {
   const pairs: Array<[Canon, string[]]> = [
     ['fullName',   ['fullName','ПІБ','П.І.Б','ФИО','ПІБ студента','Прізвище та ім’я','Прізвище ім’я по батькові']],
     ['roomNumber', ['roomNumber','Номер кімнати','Кімната','Комната','Кімната №','№ кімнати','Комната №']],
     ['faculty',    ['faculty','Факультет']],
-    ['course',     ['course','Курс','Рік навчання']],
     ['studyGroup', ['studyGroup','Навчальна група','Група','Группа']],
   ];
 
@@ -65,7 +67,6 @@ function buildHeaderAliases(): Record<string, Canon> {
 
 const HEADER_ALIASES: Readonly<Record<string, Canon>> = Object.freeze(buildHeaderAliases());
 
-
 @Injectable()
 export class ImportStudentService {
   constructor(private readonly dataSource: DataSource) {}
@@ -76,7 +77,7 @@ export class ImportStudentService {
   async importStudentsFromFile(file: Express.Multer.File): Promise<ImportReport> {
     this.assertFileNotEmpty(file);
 
-    const rawRows = this.readRowsFromXlsx(file.buffer);
+    const rawRows = await this.readRowsFromXlsx(file.buffer);
     const { prepared, invalidRows } = this.validateAndPrepare(rawRows);
     const uniqueRows = this.dedupePrepared(prepared);
     const { inserted, conflictSkipped } = await this.bulkInsertStudents(uniqueRows);
@@ -90,15 +91,39 @@ export class ImportStudentService {
     if (!file?.buffer?.length) throw new BadRequestException('File is empty!');
   }
 
-  private readRowsFromXlsx(buffer: Buffer): Row[] {
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json<Row>(ws, {
-      defval: '',
-      raw: true,
-      blankrows: false,
+  private async readRowsFromXlsx(buffer: Buffer): Promise<Row[]> {
+    const wb = new ExcelJS.Workbook();
+
+    const stream = new PassThrough();
+    stream.end(buffer);
+
+    await wb.xlsx.read(stream); // ← exceljs очікує NodeJS stream, усе сумісно
+
+    const ws = wb.worksheets[0];
+    if (!ws) throw new BadRequestException('Excel file has no sheets');
+
+    const headerRow = ws.getRow(1);
+    const headers: string[] = [];
+    headerRow.eachCell((cell, colIdx) => {
+      headers[colIdx - 1] = String(cell.value ?? '').trim();
     });
+
+    const rows: Row[] = [];
+    ws.eachRow((row, rowIdx) => {
+      if (rowIdx === 1) return;
+      const json: Row = {};
+      row.eachCell((cell, colIdx) => {
+        const header = headers[colIdx - 1] ?? `col${colIdx}`;
+        json[header] = cell.value ?? '';
+      });
+      rows.push(json);
+    });
+
+    return rows;
   }
+
+
+
 
   // -------------------- Підготовка даних --------------------
 
@@ -124,15 +149,11 @@ export class ImportStudentService {
     return { prepared, invalidRows };
   }
 
-  /**
-   * Ремап рядка за словником заголовків → Partial<ImportRow>
-   */
   private remapRowByHeaders(raw: Row): Partial<ImportRow> {
     const out: Partial<ImportRow> = {};
     for (const [k, v] of Object.entries(raw)) {
       const alias = HEADER_ALIASES[normalizeKey(k)];
       if (!alias) continue;
-      // перше непорожнє значення має пріоритет
       const prev = out[alias];
       const isPrevEmpty = prev === undefined || (typeof prev === 'string' && prev.trim() === '');
       if (isPrevEmpty) out[alias] = v as any;
@@ -140,45 +161,28 @@ export class ImportStudentService {
     return out;
   }
 
-  /**
-   * Мапінг назв колонок → внутрішній контракт ImportRow
-   */
   private mapRow(raw: Row): ImportRow {
     const m = this.remapRowByHeaders(raw);
 
-    const fullName = this.firstNonEmpty(m.fullName);
-    const roomNumber = this.firstNonEmpty(m.roomNumber);
-    const faculty = this.firstNonEmpty(m.faculty);
-    const course = this.firstNonEmpty(m.course);
-    const studyGroup = this.firstNonEmpty(m.studyGroup);
-
     return {
-      fullName: this.toCleanString(fullName),
-      roomNumber: this.toCleanString(roomNumber),
-      faculty: this.toCleanString(faculty),
-      course: this.toIntOrNaN(course),
-      studyGroup: this.toCleanString(studyGroup),
+      fullName: this.toCleanString(m.fullName),
+      roomNumber: this.toCleanString(m.roomNumber),
+      faculty: this.toCleanString(m.faculty),
+      studyGroup: this.toCleanString(m.studyGroup),
     };
   }
 
-  /**
-   * Нормалізація → DTO інстанс (class-transformer)
-   */
   private normalizeToDto(row: ImportRow): CreateStudentDto {
     const dtoLike: CreateStudentDto = {
       fullName: this.toCleanString(row.fullName),
       roomNumber: this.toCleanString(row.roomNumber),
       faculty: this.toCleanString(row.faculty),
-      course: this.toIntOrNaN(row.course),
       studyGroup: this.toCleanString(row.studyGroup),
     } as CreateStudentDto;
 
     return plainToInstance(CreateStudentDto, dtoLike, { enableImplicitConversion: true });
   }
 
-  /**
-   * Валідація DTO (class-validator) з розгортанням вкладених помилок
-   */
   private validateDto(dto: CreateStudentDto): string[] {
     const errors: ValidationError[] = validateSync(dto, { whitelist: true, forbidNonWhitelisted: true });
     return this.flattenValidationErrors(errors);
@@ -206,7 +210,7 @@ export class ImportStudentService {
           .insert()
           .into(Student)
           .values(chunk)
-          .orIgnore() // Postgres → ON CONFLICT DO NOTHING (потрібен унікальний індекс)
+          .orIgnore()
           .execute();
 
         inserted += res.identifiers.length;
@@ -229,28 +233,12 @@ export class ImportStudentService {
 
   // -------------------- Утиліти --------------------
 
-  private firstNonEmpty(...vals: unknown[]): unknown {
-    for (const v of vals) {
-      if (v === null || v === undefined) continue;
-      if (typeof v === 'string' && v.trim() === '') continue;
-      return v;
-    }
-    return '';
-  }
-
   private toCleanString(v: unknown): string {
     return String(v ?? '').trim().replace(/\s+/g, ' ');
   }
 
-  private toIntOrNaN(v: unknown): number {
-    if (typeof v === 'number') return Number.isFinite(v) ? v : Number.NaN;
-    const s = String(v ?? '').trim();
-    if (!/^\d+$/.test(s)) return Number.NaN;
-    return Number(s);
-  }
-
   private keyFromDto(x: CreateStudentDto): string {
-    return `${x.fullName}|${x.roomNumber}|${x.faculty}|${x.course}|${x.studyGroup}`;
+    return `${x.fullName}|${x.roomNumber}|${x.faculty}|${x.studyGroup}`;
   }
 
   private flattenValidationErrors(errs: ValidationError[], parentPath = ''): string[] {
@@ -260,6 +248,6 @@ export class ImportStudentService {
       if (e.constraints) out.push(...Object.values(e.constraints).map((m) => `${path}: ${m}`));
       if (e.children?.length) out.push(...this.flattenValidationErrors(e.children, path));
     }
-    return Array.from(new Set(out)); // dedupe
+    return Array.from(new Set(out));
   }
 }

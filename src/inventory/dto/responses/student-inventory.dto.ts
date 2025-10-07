@@ -1,50 +1,68 @@
 // src/inventory/dto/responses/student-inventory.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { InventoryKind } from '../../entities/InventoryKind';
 
-export class StudentInventoryDto {
-  @ApiProperty({ description: 'ID позиції (якщо є)', example: 123 })
+export class StudentBriefDto {
+  @ApiProperty({ description: 'ID студента', example: 2 })
   id!: number;
 
+  @ApiProperty({ description: 'ПІБ', example: 'Іваненко Іван Іванович' })
+  fullName!: string;
+
+  @ApiProperty({ description: 'Кімната', example: 'A-21' })
+  roomNumber!: string;
+
+  @ApiProperty({ description: 'Факультет', example: 'ФІОТ' })
+  faculty!: string;
+
+  @ApiProperty({ description: 'Курс', example: 1 })
+  course!: number;
+
+  @ApiProperty({ description: 'Навчальна група', example: 'КП-12' })
+  studyGroup!: string;
+}
+
+export class StudentInventoryDto {
   @ApiProperty({
-    description: 'ID студента-власника позиції',
-    example: 1,
-    minimum: 1,
+    description: 'UUID позиції',
+    example: 'ff8fd4f2-a5a5-4c69-b20b-4a4a5617a7c7',
+    format: 'uuid',
   })
-  studentId!: number;
+  id!: string;
 
   @ApiProperty({
     enum: InventoryKind,
     enumName: 'InventoryKind',
     description: 'Вид інвентарю',
-    example: 'mattress',
+    example: 'towel',
   })
   kind!: InventoryKind;
 
   @ApiProperty({
     description: 'Поточна кількість, видана студенту (залишок по позиції)',
-    example: 2,
+    example: 4,
     minimum: 0,
   })
   quantity!: number;
 
   @ApiProperty({
-    description: 'Ознака закриття позиції (повністю повернено)',
-    example: false,
-  })
-  isClosed!: boolean;
-
-  @ApiProperty({
     description: 'Час створення/першої видачі',
-    example: '2025-09-12T10:15:30.000Z',
+    example: '2025-09-12T21:42:37.186Z',
     format: 'date-time',
   })
   issuedAt!: string;
 
-  @ApiProperty({
-    description: 'Час останнього оновлення позиції',
-    example: '2025-09-12T11:02:10.000Z',
+  @ApiPropertyOptional({
+    description: 'Час повернення (null, якщо ще не повернено)',
+    example: null,
+    nullable: true,
     format: 'date-time',
   })
-  updatedAt!: string;
+  returnedAt?: string | null;
+
+  @ApiProperty({
+    description: 'Дані студента-власника позиції',
+    type: () => StudentBriefDto,
+  })
+  student!: StudentBriefDto;
 }

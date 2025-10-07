@@ -8,18 +8,18 @@ import { ReturnItemDto } from './dto/request/return-item.dto';
 import { InventoryKind } from './entities/InventoryKind';
 import { InventoryStock } from './entities/inventory.entities';
 import { StudentInventory } from './entities/student-inventory.entity';
-import { EntityNotFoundException } from '../common/errors/exceptions';
+import ExcelJS from 'exceljs';
 
 import { HostelRepository } from './repository/StockRepository.repository';
 import { StudentInventoryRepository } from './repository/StudentInventoryRepo.repository';
-import { StudentRepository } from '../students/students.repository';
+import { Student } from '../students/entities/student.entity';
+import { labelInventoryKind } from './util/inventory-kind.map';
 
 @Injectable()
 export class InventoriesService {
   constructor(
     private readonly stockRepo: HostelRepository,
     private readonly studInvRepo: StudentInventoryRepository,
-    private readonly studentRepo: StudentRepository,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -42,37 +42,153 @@ export class InventoriesService {
     }));
   }
 
-  // === Видача ===
+  /** ВИДАЧА */
   async issue(dto: IssueItemDto): Promise<StudentInventory> {
-    return this.dataSource.transaction(async (manager) => {
-      const stockR   = this.stockRepo.withManager(manager);
-      const studInvR = this.studInvRepo.withManager(manager);
-      const studentR = this.studentRepo.withManager(manager);
+    return this.dataSource.transaction(async (m) => {
+      const sRepo = this.studInvRepo.withManager(m);
 
-      const student = await studentR.mustExist(dto.studentId);
-      const stock   = await stockR.findByKind(dto.kind);
-      if (!stock) throw new EntityNotFoundException(`Stock for kind "${dto.kind}" not found`);
+      const student = await m.getRepository(Student).findOneByOrFail({
+        id: Number(dto.studentId),
+      });
 
-      const activeQty = await studInvR.getActiveQtyByKind(dto.kind);
-      const available = stock.total - activeQty;
-      if (available < dto.quantity) {
-        throw new BadRequestException(
-          `Not enough "${dto.kind}" available. Needed ${dto.quantity}, available ${available}.`,
-        );
-      }
+      // Збільшуємо кількість для студента або створюємо новий запис
+      const updated = await sRepo.incrementForStudent(
+        student,
+        dto.kind,
+        dto.quantity,
+      );
 
-      // один активний запис на (student, kind)
-      return studInvR.incrementForStudent(student, dto.kind, dto.quantity);
+      return updated;
     });
   }
 
-  // === Повернення ===
-  async return(dto: ReturnItemDto): Promise<StudentInventory | { closed: true }> {
-    return this.dataSource.transaction(async (manager) => {
-      const studInvR = this.studInvRepo.withManager(manager);
+  /**
+   * Будує .xlsx з переліком студентів, у яких є активні позиції.
+   * Кожний рядок — (студент, вид, кількість).
+   */
+  async exportAssignedXlsx(): Promise<Buffer> {
+    const rows = await this.studInvRepo.listActiveAssignmentsFlat();
+    // rows: { studentId, fullName, roomNumber, faculty, studyGroup, kind, quantity }[]
 
-      // метод сам кине помилку якщо активного запису немає
-      return studInvR.returnForStudent(dto.studentId, dto.kind, dto.quantity);
+    // 1) зберемо унікальні види інвентарю (стовпці півод-таблиці)
+    const kinds: string[] = Array.from(
+      new Set(rows.map(r => String(r.kind)))
+    ).sort();
+
+    // 2) згрупуємо по студентові
+    type PivotRow = {
+      studentId: number | string;
+      fullName: string;
+      roomNumber: string | number | null;
+      faculty: string | null;
+      studyGroup: string | null;
+      byKind: Record<string, number>;
+    };
+
+    const byStudent = new Map<string | number, PivotRow>();
+    for (const r of rows) {
+      const key = r.studentId;
+      let bucket = byStudent.get(key);
+      if (!bucket) {
+        bucket = {
+          studentId: r.studentId,
+          fullName: r.fullName,
+          roomNumber: r.roomNumber,
+          faculty: r.faculty,
+          studyGroup: r.studyGroup,
+          byKind: {},
+        };
+        // ініціалізуємо нулями для всіх видів, щоб комірки не були пустими
+        for (const k of kinds) bucket.byKind[k] = 0;
+        byStudent.set(key, bucket);
+      }
+      bucket.byKind[String(r.kind)] += Number(r.quantity ?? 0);
+    }
+
+    // 3) будуємо Excel
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Assigned (Pivot)');
+
+    // Шапка: базові поля + всі види інвентарю
+    const header = [
+      'ID студента',
+      'ПІБ',
+      'Кімната',
+      'Факультет',
+      'Група',
+      ...kinds.map(k => labelInventoryKind(k)),
+    ];
+    ws.addRow(header);
+    ws.getRow(1).font = { bold: true };
+
+    // 4) Рядки
+    for (const r of byStudent.values()) {
+      const kindCells = kinds.map(k => r.byKind[k] ?? 0);
+      ws.addRow([
+        r.studentId,
+        r.fullName,
+        r.roomNumber ?? '',
+        r.faculty ?? '',
+        r.studyGroup ?? '',
+        ...kindCells,
+      ]);
+    }
+
+    // 5) Автопідгін ширини
+    const colCount = ws.columnCount;
+    for (let i = 1; i <= colCount; i++) {
+      const col = ws.getColumn(i);
+      let max = 12;
+      col.eachCell({ includeEmpty: false }, cell => {
+        const v = cell.value as unknown;
+        let s = '';
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+          s = String(v);
+        } else if (v instanceof Date) {
+          s = v.toISOString();
+        } else if (v && typeof v === 'object' && 'text' in (v as any)) {
+          s = String((v as any).text ?? '');
+        }
+        max = Math.max(max, s.length + 2);
+      });
+      col.width = Math.min(max, 40);
+    }
+
+    const out = await wb.xlsx.writeBuffer();
+    return out instanceof Buffer ? out : Buffer.from(new Uint8Array(out as ArrayBuffer));
+  }
+
+  /** ПОВЕРНЕННЯ */
+  async return(dto: ReturnItemDto): Promise<StudentInventory | { closed: true }> {
+    return this.dataSource.transaction(async (m) => {
+      const sRepo = this.studInvRepo.withManager(m);
+
+      const student = await m.getRepository(Student).findOneByOrFail({
+        id: Number(dto.studentId),
+      });
+
+      // Дістаємо активну позицію (якщо нема — помилка)
+      const active = await sRepo.findActiveByStudentAndKind(
+        dto.studentId,
+        dto.kind,
+      );
+      if (!active) throw new Error('Active assignment not found');
+
+      // Обчислюємо, скільки реально повертається
+      const requested = dto.quantity ?? null;
+      const returnedQty =
+        !requested || requested >= active.quantity
+          ? active.quantity
+          : requested;
+
+      // Якщо повертається вся кількість — закриваємо запис
+      const result = await sRepo.returnForStudent(
+        dto.studentId,
+        dto.kind,
+        dto.quantity ?? null,
+      );
+
+      return result;
     });
   }
 
