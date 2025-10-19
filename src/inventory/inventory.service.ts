@@ -70,12 +70,12 @@ export class InventoriesService {
     const rows = await this.studInvRepo.listActiveAssignmentsFlat();
     // rows: { studentId, fullName, roomNumber, faculty, studyGroup, kind, quantity }[]
 
-    // 1) зберемо унікальні види інвентарю (стовпці півод-таблиці)
+    // 1) Збираємо унікальні види інвентарю (для стовпців зведеної таблиці)
     const kinds: string[] = Array.from(
       new Set(rows.map(r => String(r.kind)))
     ).sort();
 
-    // 2) згрупуємо по студентові
+    // 2) Групуємо по студентові
     type PivotRow = {
       studentId: number | string;
       fullName: string;
@@ -86,6 +86,7 @@ export class InventoriesService {
     };
 
     const byStudent = new Map<string | number, PivotRow>();
+
     for (const r of rows) {
       const key = r.studentId;
       let bucket = byStudent.get(key);
@@ -98,14 +99,14 @@ export class InventoriesService {
           studyGroup: r.studyGroup,
           byKind: {},
         };
-        // ініціалізуємо нулями для всіх видів, щоб комірки не були пустими
-        for (const k of kinds) bucket.byKind[k] = 0;
         byStudent.set(key, bucket);
       }
-      bucket.byKind[String(r.kind)] += Number(r.quantity ?? 0);
+      // Накопичуємо кількість лише для реально виданих позицій
+      bucket.byKind[String(r.kind)] =
+        (bucket.byKind[String(r.kind)] ?? 0) + Number(r.quantity ?? 0);
     }
 
-    // 3) будуємо Excel
+    // 3) Будуємо Excel
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Assigned (Pivot)');
 
@@ -123,7 +124,10 @@ export class InventoriesService {
 
     // 4) Рядки
     for (const r of byStudent.values()) {
-      const kindCells = kinds.map(k => r.byKind[k] ?? 0);
+      // Якщо студент не має певного інвентарю — комірка буде порожньою
+      const kindCells = kinds.map(k =>
+        r.byKind[k] !== undefined ? r.byKind[k] : ''
+      );
       ws.addRow([
         r.studentId,
         r.fullName,
@@ -154,6 +158,7 @@ export class InventoriesService {
       col.width = Math.min(max, 40);
     }
 
+    // 6) Генеруємо буфер
     const out = await wb.xlsx.writeBuffer();
     return out instanceof Buffer ? out : Buffer.from(new Uint8Array(out as ArrayBuffer));
   }
